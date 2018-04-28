@@ -50,6 +50,12 @@ char* WhiteIP[] = {
 	NULL
 };
 
+//IP黑名单
+char* BlackIP[] = {
+	"172.20.27.65",
+	NULL
+};
+
 //限制IP，只有白名单中的地址才能访问
 char* LimitedAddr[] = {
 	"http://jwes.hit.edu.cn/",
@@ -61,6 +67,10 @@ char* ForbiddenAddr[] = {
 	"http://today.hit.edu.cn/",
 	NULL
 };
+
+int phishing = 1;
+char Phishing_addr[] = "sougou.com";
+char Phishing_addr_http[] = "http://www.sougou.com/ HTTP/1.1";
 
 //由于新的连接都使用新线程进行处理，对线程的频繁的创建和销毁特别浪费资源
 //可以使用线程池技术提高服务器效率
@@ -304,41 +314,64 @@ void ParseHttpHead(char *buffer, HttpHeader * httpHeader, char *IP_addr) {
 	const char * delim = "\r\n";
 	p = strtok_s(buffer, delim, &ptr);//提取第一行
 	printf("%s\n", p);
-	if (p[0] == 'G') {//GET 方式
-		//p = "GET today.hit.edu.cn HTTP/1.1";
-		memcpy(httpHeader->method, "GET", 3);
-		memcpy(httpHeader->url, &p[4], strlen(p) - 13);
-	}
-	else if (p[0] == 'P') {//POST 方式
-		memcpy(httpHeader->method, "POST", 4);
-		memcpy(httpHeader->url, &p[5], strlen(p) - 14);
-	}
 	printf("%s\n", httpHeader->url);
 	int flag = 0;
-	int limited = 0;
-	while (LimitedAddr[flag] != NULL) {
-		if (strcmp(LimitedAddr[flag], httpHeader->url) == 0) {
-			limited = 1;
-			break;
+	int black = 0;
+	while (BlackIP[flag] != NULL) {
+		if (strcmp(BlackIP[flag], IP_addr) == 0) {
+			black = 1;
+			if (phishing) break;
+			else return;
 		}
 		flag++;
 	}
-	if (limited) {
+	if (p[0] == 'G') {//GET 方式
+		memcpy(httpHeader->method, "GET", 3);
+		//p = "GET http://www.sogou.com/ HTTP/1.1";
+		if (black) memcpy(httpHeader->url, &Phishing_addr_http, sizeof(Phishing_addr_http));
+		else memcpy(httpHeader->url, &p[4], strlen(p) - 13);
+	}
+	else if (p[0] == 'P') {//POST 方式
+		memcpy(httpHeader->method, "POST", 4);
+		if (black) memcpy(httpHeader->url, &Phishing_addr_http, sizeof(Phishing_addr_http));
+		else memcpy(httpHeader->url, &p[5], strlen(p) - 14);
+	}
+	if (!black) {
 		flag = 0;
-		while (WhiteIP[flag] != NULL) {
-			if (strcmp(WhiteIP[flag], IP_addr) == 0) {
+		while (ForbiddenAddr[flag] != NULL) {
+			if (strcmp(ForbiddenAddr[flag], httpHeader->url) == 0) {
 				return;
 			}
 			flag++;
 		}
+		flag = 0;
+		int limited = 0;
+		while (LimitedAddr[flag] != NULL) {
+			if (strcmp(LimitedAddr[flag], httpHeader->url) == 0) {
+				limited = 1;
+				break;
+			}
+			flag++;
+		}
+		if (limited) {
+			flag = 0;
+			while (WhiteIP[flag] != NULL) {
+				if (strcmp(WhiteIP[flag], IP_addr) == 0) {
+					limited = 0;
+				}
+				flag++;
+			}
+		}
+		if (limited) return;
 	}
 	p = strtok_s(NULL, delim, &ptr);
 	while (p) {
 		switch (p[0]) {
 		case 'H'://Host
 			printf("--->>> host : %s", p);
-			//p="Host: today.hit.edu.cn";
-			memcpy(httpHeader->host, &p[6], strlen(p) - 6);
+			//p="Host: www.sogou.com";
+			if (black)memcpy(httpHeader->host, &Phishing_addr, sizeof(Phishing_addr));
+			else memcpy(httpHeader->host, &p[6], strlen(p) - 6);
 			break;
 		case 'C'://Cookie
 			if (strlen(p) > 8) {
