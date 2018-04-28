@@ -19,6 +19,17 @@ struct HttpHeader {
 	}
 };
 
+#define cache_size 1000
+
+struct CACHE_ITEM {
+	char url[1024];
+	char buffer[65507];
+	char last_modified_date[30];
+};
+
+CACHE_ITEM cache[cache_size];
+int cache_flag = 0;
+
 struct ADV_P {
 	struct ProxyParam* lpProxyParam;
 	char* IP_addr;
@@ -33,13 +44,21 @@ SOCKET ProxyServer;
 sockaddr_in ProxyServerAddr;
 const int ProxyPort = 10240;
 
+//IP白名单
 char* WhiteIP[] = {
 	"172.20.12.134",
 	NULL
 };
 
+//限制IP，只有白名单中的地址才能访问
 char* LimitedAddr[] = {
 	"http://jwes.hit.edu.cn/",
+	NULL
+};
+
+//禁止地址，所有客户均不能访问
+char* ForbiddenAddr[] = {
+	"http://today.hit.edu.cn/",
 	NULL
 };
 
@@ -167,15 +186,98 @@ unsigned int __stdcall ProxyThread(LPVOID adv_p) {
 		goto error;
 	}
 	printf("代理连接主机 %s 成功\n", httpHeader->host);
-	//将客户端发送的 HTTP 数据报文直接转发给目标服务器
-	ret = send(((ProxyParam *)lpParameter)->serverSocket, Buffer, strlen(Buffer) + 1, 0);
-	//等待目标服务器返回数据
-	recvSize = recv(((ProxyParam*)lpParameter)->serverSocket, Buffer, MAXSIZE, 0);
-	if (recvSize <= 0) {
-		goto error;
+	
+	int found = 0;
+	if (strcmp(httpHeader->url, "http://today.hit.edu.cn/") == 0) {
+		int ccc;
+		ccc = 0;
 	}
-	//将目标服务器返回的数据直接转发给客户端
-	ret = send(((ProxyParam*)lpParameter)->clientSocket, Buffer, sizeof(Buffer), 0);
+	for (int i = 0; i < cache_size; ++i) {
+		if (cache[i].url != NULL && strcmp(httpHeader->url, cache[i].url) == 0) {
+			found = 1;
+			int not_modified = 1;
+			int length = strlen(Buffer);
+			char * pr = Buffer + length;
+			memcpy(pr, "If-modified-since: ", 19);
+			pr += 19;
+			length = strlen(cache[i].last_modified_date);
+			memcpy(pr, cache[i].last_modified_date, length);
+			ret = send(((ProxyParam *)lpParameter)->serverSocket, Buffer, strlen(Buffer) + 1, 0);
+
+			recvSize = recv(((ProxyParam *)lpParameter)->serverSocket, Buffer, MAXSIZE, 0);
+			if (recvSize <= 0) {
+				goto error;
+			}
+
+			const char *blank = " ";
+			const char *Modd = "304";
+			if (!memcmp(&Buffer[9], Modd, strlen(Modd)))
+			{
+				ret = send(((ProxyParam*)lpParameter)->clientSocket, cache[i].buffer, strlen(cache[i].buffer) + 1, 0);
+				break;
+			}
+			char *cacheBuff = new char[MAXSIZE];
+			ZeroMemory(cacheBuff, MAXSIZE);
+			memcpy(cacheBuff, Buffer, MAXSIZE);
+			const char *delim = "\r\n";
+			char *ptr;
+			//char dada[DATELENGTH];
+			//ZeroMemory(dada, sizeof(dada));
+			char *p = strtok_s(cacheBuff, delim, &ptr);
+			while (p) {
+				if (p[0] == 'L') {
+					if (strlen(p) > 15) {
+						if (!(strcmp(cache[i].last_modified_date, "Last-Modified:")))
+						{
+							memcpy(cache[i].last_modified_date, &p[15], strlen(p) - 15);
+							not_modified = 0;
+							break;
+						}
+					}
+				}
+				p = strtok_s(NULL, delim, &ptr);
+			}
+			memcpy(cache[i].url, httpHeader->url, sizeof(httpHeader->url));
+			memcpy(cache[i].buffer, Buffer, sizeof(Buffer));
+			ret = send(((ProxyParam*)lpParameter)->clientSocket, Buffer, sizeof(Buffer), 0);
+
+			break;
+		}
+	}
+	if (!found) {
+		//将客户端发送的 HTTP 数据报文直接转发给目标服务器
+		ret = send(((ProxyParam *)lpParameter)->serverSocket, Buffer, strlen(Buffer) + 1, 0);
+		//等待目标服务器返回数据
+		recvSize = recv(((ProxyParam*)lpParameter)->serverSocket, Buffer, MAXSIZE, 0);
+		if (recvSize <= 0) {
+			goto error;
+		}
+		//将目标服务器返回的数据直接转发给客户端
+		ret = send(((ProxyParam*)lpParameter)->clientSocket, Buffer, sizeof(Buffer), 0);
+		//if (strcmp(httpHeader->url, "http://today.hit.edu.cn/") == 0) {
+			cache_flag = (cache_flag + 1) % cache_size;
+			memcpy(cache[cache_flag].url, httpHeader->url, sizeof(httpHeader->url));
+			memcpy(cache[cache_flag].buffer, Buffer, sizeof(Buffer));
+
+			char *cacheBuff = new char[MAXSIZE];
+			ZeroMemory(cacheBuff, MAXSIZE);
+			memcpy(cacheBuff, Buffer, MAXSIZE);
+			const char *delim = "\r\n";
+			char *ptr;
+			//char dada[DATELENGTH];
+			//ZeroMemory(dada, sizeof(dada));
+			char *p = strtok_s(cacheBuff, delim, &ptr);
+			while (p) {
+				if (p[0] == 'L') {
+					if (strlen(p) > 15) {
+						memcpy(cache[cache_flag].last_modified_date, &p[15], strlen(p) - 15);
+						break;
+					}
+				}
+				p = strtok_s(NULL, delim, &ptr);
+			}
+		//}	
+	}
 	//错误处理
 error:
 	printf("关闭套接字\n");
