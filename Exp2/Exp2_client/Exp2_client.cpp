@@ -115,8 +115,7 @@ int main(int argc, char* argv[])
 						printf("Ready for file transmission\n");
 						buffer[0] = 200;
 						buffer[1] = '\0';
-						sendto(socketClient, buffer, 2, 0,
-							(SOCKADDR*)&addrServer, sizeof(SOCKADDR));
+						sendto(socketClient, buffer, 2, 0,(SOCKADDR*)&addrServer, sizeof(SOCKADDR));
 						stage = 1;
 						recvSeq = 0;
 						waitSeq = 1;
@@ -132,13 +131,13 @@ int main(int argc, char* argv[])
 					}
 					printf("recv a packet with a seq of %d\n", seq);
 					//如果是期待的包，正确接收，正常确认即可
-					if (!(waitSeq - seq)) {
+					if (waitSeq == seq) {
 						++waitSeq;
 						if (waitSeq == 21) {
 							waitSeq = 1;
 						}
 						//输出数据
-						//printf("%s\n",&buffer[1]);
+						printf("%s\n",&buffer[1]);
 						buffer[0] = seq;
 						recvSeq = seq;
 						buffer[1] = '\0';
@@ -153,12 +152,10 @@ int main(int argc, char* argv[])
 					}
 					b = lossInLossRatio(ackLossRatio);
 					if (b) {
-						printf("The ack of %d loss\n", (unsigned
-							char)buffer[0]);
+						printf("The ack of %d loss\n", (unsigned char)buffer[0]);
 						continue;
 					}
-					sendto(socketClient, buffer, 2, 0,
-						(SOCKADDR*)&addrServer, sizeof(SOCKADDR));
+					sendto(socketClient, buffer, 2, 0,(SOCKADDR*)&addrServer, sizeof(SOCKADDR));
 					printf("send a ack of %d\n", (unsigned char)buffer[0]);
 					break;
 				}
@@ -180,4 +177,4 @@ int main(int argc, char* argv[])
 	closesocket(socketClient);
 	WSACleanup();
 	return 0;
-}
+}

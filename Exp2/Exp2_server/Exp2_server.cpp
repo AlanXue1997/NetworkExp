@@ -21,14 +21,15 @@ int curSeq;//当前数据包的 seq
 int curAck;//当前等待确认的 ack
 int totalSeq;//收到的包的总数
 int totalPacket;//需要发送的包总数
-				//************************************
-				// Method: getCurTime
-				// FullName: getCurTime
-				// Access: public
-				// Returns: void
-				// Qualifier: 获取当前系统时间，结果存入 ptime 中
-				// Parameter: char * ptime
-				//************************************
+
+//************************************
+// Method: getCurTime
+// FullName: getCurTime
+// Access: public
+// Returns: void
+// Qualifier: 获取当前系统时间，结果存入 ptime 中
+// Parameter: char * ptime
+//************************************
 void getCurTime(char *ptime) {
 	char buffer[128];
 	memset(buffer, 0, sizeof(buffer));
@@ -45,6 +46,7 @@ void getCurTime(char *ptime) {
 		p->tm_sec);
 	strcpy_s(ptime, sizeof(buffer), buffer);
 }
+
 //************************************
 // Method: seqIsAvailable
 // FullName: seqIsAvailable
@@ -65,6 +67,7 @@ bool seqIsAvailable() {
 	}
 	return false;
 }
+
 //************************************
 // Method: timeoutHandler
 // FullName: timeoutHandler
@@ -82,6 +85,7 @@ void timeoutHandler() {
 	totalSeq -= SEND_WIND_SIZE;
 	curSeq = curAck;
 }
+
 //************************************
 // Method: ackHandler
 // FullName: ackHandler
@@ -141,7 +145,7 @@ int main(int argc, char* argv[])
 	int iMode = 1; //1：非阻塞，0：阻塞
 	ioctlsocket(sockServer, FIONBIO, (u_long FAR*) &iMode);//非阻塞设置
 	SOCKADDR_IN addrServer; //服务器地址
-							//addrServer.sin_addr.S_un.S_addr = inet_addr(SERVER_IP);
+	//addrServer.sin_addr.S_un.S_addr = inet_addr(SERVER_IP);
 	addrServer.sin_addr.S_un.S_addr = htonl(INADDR_ANY);//两者均可
 	addrServer.sin_family = AF_INET;
 	addrServer.sin_port = htons(SERVER_PORT);
@@ -170,8 +174,7 @@ int main(int argc, char* argv[])
 	}
 	while (true) {
 		//非阻塞接收，若没有收到数据，返回值为-1
-		recvSize =
-			recvfrom(sockServer, buffer, BUFFER_LENGTH, 0, ((SOCKADDR*)&addrClient), &length);
+		recvSize = recvfrom(sockServer, buffer, BUFFER_LENGTH, 0, ((SOCKADDR*)&addrClient), &length);
 		if (recvSize < 0) {
 			Sleep(200);
 			continue;
@@ -186,12 +189,12 @@ int main(int argc, char* argv[])
 		else if (strcmp(buffer, "-testgbn") == 0) {
 			//进入 gbn 测试阶段
 			//首先 server（server 处于 0 状态）向 client 发送 205 状态码（server进入 1 状态）
-			//server 等待 client 回复 200 状态码，如果收到（server 进入 2 状态），则开始传输文件，否则延时等待直至超时\
-							//在文件传输阶段，server 发送窗口大小设为
+			//server 等待 client 回复 200 状态码，如果收到（server 进入 2 状态），则开始传输文件，否则延时等待直至超时
+			//在文件传输阶段，server 发送窗口大小设为
 			ZeroMemory(buffer, sizeof(buffer));
 			int recvSize;
 			int waitCount = 0;
-			printf("Begain to test GBN protocol,please don't abort the process\n");
+			printf("Begin to test GBN protocol,please don't abort the process\n");
 			//加入了一个握手阶段
 			//首先服务器向客户端发送一个 205 大小的状态码（我自己定义的）表示服务器准备好了，可以发送数据
 			//客户端收到 205 之后回复一个 200 大小的状态码，表示客户端准备好了，可以接收数据了
@@ -203,8 +206,7 @@ int main(int argc, char* argv[])
 				switch (stage) {
 				case 0://发送 205 阶段
 					buffer[0] = 205;
-					sendto(sockServer, buffer, strlen(buffer) + 1, 0,
-						(SOCKADDR*)&addrClient, sizeof(SOCKADDR));
+					sendto(sockServer, buffer, strlen(buffer) + 1, 0,(SOCKADDR*)&addrClient, sizeof(SOCKADDR));
 					Sleep(100);
 					stage = 1;
 					break;
@@ -241,16 +243,14 @@ int main(int argc, char* argv[])
 						//为简化过程此处并未实现
 						memcpy(&buffer[1], data + 1024 * totalSeq, 1024);
 						printf("send a packet with a seq of %d\n", curSeq);
-						sendto(sockServer, buffer, BUFFER_LENGTH, 0,
-							(SOCKADDR*)&addrClient, sizeof(SOCKADDR));
+						sendto(sockServer, buffer, BUFFER_LENGTH, 0,(SOCKADDR*)&addrClient, sizeof(SOCKADDR));
 						++curSeq;
 						curSeq %= SEQ_SIZE;
 						++totalSeq;
 						Sleep(500);
 					}
 					//等待 Ack，若没有收到，则返回值为-1，计数器+1
-					recvSize =
-						recvfrom(sockServer, buffer, BUFFER_LENGTH, 0, ((SOCKADDR*)&addrClient), &length);
+					recvSize = recvfrom(sockServer, buffer, BUFFER_LENGTH, 0, ((SOCKADDR*)&addrClient), &length);
 					if (recvSize < 0) {
 						waitCount++;
 						//20 次等待 ack 则超时重传
@@ -270,8 +270,7 @@ int main(int argc, char* argv[])
 				}
 			}
 		}
-		sendto(sockServer, buffer, strlen(buffer) + 1, 0, (SOCKADDR*)&addrClient,
-			sizeof(SOCKADDR));
+		sendto(sockServer, buffer, strlen(buffer) + 1, 0, (SOCKADDR*)&addrClient,sizeof(SOCKADDR));
 		Sleep(500);
 	}
 	//关闭套接字，卸载库
