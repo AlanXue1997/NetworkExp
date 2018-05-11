@@ -1,6 +1,5 @@
 
 #define _CRT_SECURE_NO_WARNINGS
-#include "stdafx.h"
 #include <stdlib.h> 
 #include <time.h> 
 #include <WinSock2.h> 

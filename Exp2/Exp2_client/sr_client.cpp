@@ -1,6 +1,6 @@
 // GBN_client.cpp :  定义控制台应用程序的入口点。 
 // 
-#include "stdafx.h" 
+//#include "stdafx.h" 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdlib.h> 
